@@ -15,6 +15,12 @@ someone silently. Each release below records its catalogue size.
 
 ### Fixed
 
+- **Zvabd's encodings match the v0.9 draft.** ARC reassigned them
+  (riscv-isa-manual#3279): VABD and VABDU moved to funct6 0x15 and 0x16, and
+  VWABDA and VWABDAU to 0x3D and 0x3E in the OPIVV space. The four `.vx` forms
+  the draft adds are now listed, and VABS.V is gone: the draft defines it as an
+  assembler alias for `vabd.vx vd, vs2, x0`, not an encoding of its own. Sail
+  and Spike link all eight.
 - **The Use Case box is readable in the light theme.** A rule meant to darken
   the catalogue's coloured group headings also caught the details panel's own
   sections, so the white Use Case box was halved to mid-grey with muddy text,
@@ -23,6 +29,14 @@ someone silently. Each release below records its catalogue size.
 
 ### Changed
 
+- **Linux 7.3 in the toolchain data.** It detects Smcdeleg, Smcntrpmf,
+  Smcsrind, Ssccfg, Sscsrind, Ssqosid, Za64rs, Ziccamoa, Ziccif and Zicclsm.
+- **Synced with riscv-unified-db `3c02662`.** Sspmp needs Smpmpdeleg only
+  alongside Machine ISA 1.13, so the builder no longer adds it to every SPMP
+  configuration; `menvcfg` and `henvcfg` gain Smcdeleg's CDE bit; VABD and
+  VABDU accept SEW=32 (and 64 with Zve64x). UDB now writes the hypervisor
+  loads and stores and FLQ with their address in parentheses, so the local
+  corrections for them are gone.
 - **CSR details are drawn like the ISA manual's register figures.** The
   register is laid out in 32-bit rows with bit numbers on every field, one-bit
   fields labelled vertically, and each field coloured by what software can do
