@@ -238,6 +238,22 @@ test('cell text is escaped and characters XML forbids are dropped', () => {
   assert.match(files.get('xl/workbook.xml'), /name="a b c"/);
 });
 
+test('non-BMP characters (e.g. emoji) survive xlsx XML escaping', () => {
+  const files = readZip(buildXlsx([{ name: 'Sheet1', rows: [['h'], ['😀 test ✓']] }]));
+  const sheet = files.get('xl/worksheets/sheet1.xml');
+  assert.ok(sheet.includes('<t xml:space="preserve">😀 test ✓</t>'));
+});
+
+test('an unpaired surrogate is stripped from xlsx text, leaving its neighbours', () => {
+  // With the `u` flag a lone surrogate is one code point outside XML 1.0's
+  // Char range, so it is removed whole; left in, Excel rejects the workbook.
+  const files = readZip(buildXlsx([{ name: 'Sheet1', rows: [['h'], ['a\uD800b'], ['c\uDC00d']] }]));
+  const sheet = files.get('xl/worksheets/sheet1.xml');
+  assert.ok(sheet.includes('<t xml:space="preserve">ab</t>'));
+  assert.ok(sheet.includes('<t xml:space="preserve">cd</t>'));
+  assert.doesNotMatch(sheet, /[\uD800-\uDFFF]/u);
+});
+
 test('column names run A..Z then AA', () => {
   assert.deepEqual([0, 1, 25, 26, 27, 51, 52].map(columnName), [
     'A',
