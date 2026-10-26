@@ -440,5 +440,45 @@ test('unrecognised single-letter extensions sort after recognised ones in riscv-
   // prevents an unrecognised single-letter extension from sorting ahead of standard letters (#311).
   const { yaml } = buildIsaConfigYaml(['RV64I', 'M', 'C', 'X'], ALL, { format: 'riscv-config' });
   const isa = yaml.match(/^ {2}ISA: (\S+)/m)[1];
-  assert.match(isa, /^RV64IMCX/, `standard extensions must lead before unrecognised single letters: ${isa}`);
+  assert.match(
+    isa,
+    /^RV64IMCX/,
+    `standard extensions must lead before unrecognised single letters: ${isa}`,
+  );
+});
+
+test('S-mode sub-extensions follow Z-extensions in riscv-config format', () => {
+  const { yaml: withBoth } = buildIsaConfigYaml(['RV64I', 'Zca', 'Smdbltrp'], ALL, {
+    format: 'riscv-config',
+  });
+  const isaWithBoth = withBoth.match(/^ {2}ISA: (\S+)/m)[1];
+  assert.equal(isaWithBoth, 'RV64IZca_Smdbltrp');
+
+  const { yaml: onlyS } = buildIsaConfigYaml(['RV64I', 'Smdbltrp'], ALL, {
+    format: 'riscv-config',
+  });
+  const isaOnlyS = onlyS.match(/^ {2}ISA: (\S+)/m)[1];
+  assert.equal(isaOnlyS, 'RV64ISmdbltrp');
+
+  const { yaml: twoS } = buildIsaConfigYaml(['RV64I', 'M', 'Svnapot', 'Svadu'], ALL, {
+    format: 'riscv-config',
+  });
+  const isaTwoS = twoS.match(/^ {2}ISA: (\S+)/m)[1];
+  assert.equal(isaTwoS, 'RV64IMSvadu_Svnapot');
+
+  const { yaml: levels } = buildIsaConfigYaml(
+    ['RV64I', 'Zca', 'Smdbltrp', 'Ssdbltrp', 'Svadu', 'Sdext'],
+    ALL,
+    { format: 'riscv-config' },
+  );
+  const isaLevels = levels.match(/^ {2}ISA: (\S+)/m)[1];
+  assert.equal(isaLevels, 'RV64IZca_Ssdbltrp_Svadu_Smdbltrp_Sdext');
+
+  const { yaml: fullOrder } = buildIsaConfigYaml(
+    ['RV64I', 'Zca', 'Ssdbltrp', 'Svadu', 'Svnapot', 'Smdbltrp', 'Smrnmi', 'Sddbltrp', 'Sdext'],
+    ALL,
+    { format: 'riscv-config' },
+  );
+  const isaFullOrder = fullOrder.match(/^ {2}ISA: (\S+)/m)[1];
+  assert.equal(isaFullOrder, 'RV64IZca_Ssdbltrp_Svadu_Svnapot_Smdbltrp_Smrnmi_Sddbltrp_Sdext');
 });

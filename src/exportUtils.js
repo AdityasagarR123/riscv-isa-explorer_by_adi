@@ -81,6 +81,31 @@ function riscvConfigSort(a, b) {
 }
 
 /**
+ * S-extension ordering per the RISC-V Unprivileged ISA Specification
+ * (src/unpriv/naming.adoc, "Extension Naming Conventions"):
+ *   1. Su* (user level)
+ *   2. Ss* and Sv* together (supervisor level)
+ *   3. Sh* (hypervisor level)
+ *   4. Sm* (machine level)
+ *
+ * Within each privilege level, extensions sort alphabetically.
+ * The manual gives no position for Sd* (debug extensions); we place them after Sm*.
+ */
+function sLevelRank(name) {
+  const prefix = name.slice(0, 2).toLowerCase();
+  if (prefix === 'su') return 1;
+  if (prefix === 'ss' || prefix === 'sv') return 2;
+  if (prefix === 'sh') return 3;
+  if (prefix === 'sm') return 4;
+  if (prefix === 'sd') return 5;
+  return 6;
+}
+
+function riscvConfigSSort(a, b) {
+  return sLevelRank(a) - sLevelRank(b) || a.localeCompare(b);
+}
+
+/**
  * The params a UDB architecture configuration needs that no extension selection
  * implies. Transcribed from the configs riscv-arch-test ships, which are the
  * working examples of what a complete one looks like.
@@ -452,26 +477,35 @@ export function buildIsaConfigYaml(selectedIds, allExts, options = {}) {
       .join('');
     const vPresent = rcSingles.includes('V');
     const shorthandAbsorbed = absorbedByShorthand(selectedIds);
+    // Orders sub-extensions with Z-extensions first (sorted by their second
+    // character per riscv-config's canonical ordering) followed by S-extensions
+    // ordered by privilege level (Su, Ss/Sv together, Sh, Sm) per the ISA
+    // manual (src/unpriv/naming.adoc), and alphabetically within each level.
+    // The manual gives no position for Sd* (debug extensions), which are
+    // placed after Sm*. Attaches the first sub-extension directly to the
+    // base letters without an underscore.
     const rcCandidates = zExts.filter((z) => {
       if (vPresent && /^Zv(e|l)/i.test(z)) return false;
       if (shorthandAbsorbed.has(z)) return false;
       return true;
     });
-    const rcKnown = rcCandidates
-      .filter((z) => RISCV_CONFIG_SUB_EXTENSIONS.has(z))
-      .sort(riscvConfigSort);
+    const rcKnownCandidates = rcCandidates.filter((z) => RISCV_CONFIG_SUB_EXTENSIONS.has(z));
+    const rcZ = rcKnownCandidates.filter((z) => /^z/i.test(z)).sort(riscvConfigSort);
+    const rcS = rcKnownCandidates.filter((z) => !/^z/i.test(z)).sort(riscvConfigSSort);
+    const rcKnown = [...rcZ, ...rcS];
     const rcDropped = rcCandidates.filter((z) => !RISCV_CONFIG_SUB_EXTENSIONS.has(z)).sort();
     const rcAbsorbed = vPresent ? zExts.filter((z) => /^Zv(e|l)/i.test(z)).sort() : [];
     const rcIsa =
-      `${basePrefix}${rcSingles}${rcKnown.length ? rcKnown[0] : ''}` +
+      `${basePrefix}${rcSingles}${rcKnown[0] ?? ''}` +
       rcKnown
         .slice(1)
         .map((z) => `_${z}`)
         .join('');
 
     rc.push(`  # riscv-config Capitalises sub-extensions, attaches the first directly to`);
-    rc.push(`  # the base letters, and orders them by the canonical letter of the second`);
-    rc.push(`  # character — Zicsr before Zca — none of which matches -march.`);
+    rc.push(`  # the base letters, and orders them with Z-extensions first (by their`);
+    rc.push(`  # second character — Zicsr before Zca) followed by S-extensions by privilege`);
+    rc.push(`  # level (Su, Ss/Sv, Sh, Sm, Sd) and alphabetically within each level.`);
     rc.push(`  ISA: ${rcIsa}`);
     rc.push(
       `  physical_addr_sz: 32          # TODO physical address width for your implementation`,
